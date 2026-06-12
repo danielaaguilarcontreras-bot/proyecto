@@ -1,0 +1,408 @@
+// NIVELES (sin imágenes)
+const LEVELS = [
+    { name: "NEBULOSA ÓRBITA", enemyName: "ESPECTRO DE NEBULOSIS", enemyMaxHp: 2,
+      questions: [
+        { text: "¿Qué extraño fenómeno ocurre en Titán (luna de Saturno)?", 
+          options: ["Océanos de mercurio", "Lagos de metano líquido", "Volcanes de hielo seco", "Tormentas de arena de diamante"], 
+          correct: 1, 
+          fact: "Titán es el único lugar con lagos estables de metano líquido en superficie." },
+        { text: "¿Cuál es el objeto más frío conocido en el universo?", 
+          options: ["Nebulosa Bumerang", "Plutón", "Nube de Oort", "Polo sur lunar"], 
+          correct: 0, 
+          fact: "La Nebulosa Bumerang alcanza -272°C, solo 1° sobre el cero absoluto." }
+    ]},
+    { name: "CÚMULO PROHIBIDO", enemyName: "GUARDIÁN DEL CÚMULO", enemyMaxHp: 2,
+      questions: [
+        { text: "¿Qué planeta extrasolar tiene lluvia de vidrio fundido lateral?", 
+          options: ["Kepler-22b", "HD 189733b", "Próxima b", "TRAPPIST-1e"], 
+          correct: 1, 
+          fact: "HD 189733b tiene vientos de 8700 km/h y llueve vidrio de lado." },
+        { text: "¿Qué misterioso 'Gran Atractor' influye en nuestra galaxia?", 
+          options: ["Un agujero negro", "Materia oscura concentrada", "Supercúmulo de Norma", "Energía fantasma"], 
+          correct: 2, 
+          fact: "El Gran Atractor es una anomalía gravitacional que atrae a la Vía Láctea." }
+    ]},
+    { name: "HORIZONTE DE SUCESIÓN", enemyName: "SOMBRA DEL SINGULARIS", enemyMaxHp: 2,
+      questions: [
+        { text: "¿Qué exoplaneta tiene densidad similar al algodón de azúcar?", 
+          options: ["WASP-193b", "J1407b", "55 Cancri e", "TrES-2b"], 
+          correct: 0, 
+          fact: "WASP-193b es un planeta esponja ultraligero, densidad comparable al algodón de azúcar." },
+        { text: "¿Qué fenómeno produce ráfagas de radio ultrapotentes de milisegundos?", 
+          options: ["Supernovas", "FRB (Ráfagas rápidas)", "Púlsares gemelos", "Magnetares"], 
+          correct: 1, 
+          fact: "Los FRB emiten en milisegundos tanta energía como el Sol en un siglo." }
+    ]}
+];
+
+// Estado del juego
+let currentLevel = 0, currentQIndex = 0, score = 0, lives = 3, collectedFacts = [], enemyCurrentHp = 2;
+let waitingResponse = false, gameActive = true, playerName = "";
+
+// DOM
+const welcomeDiv = document.getElementById("welcomeScreen");
+const gameInterface = document.getElementById("gameInterface");
+const startBtn = document.getElementById("startGameBtn");
+const playerNameInput = document.getElementById("playerNameInput");
+const playerNameDisplay = document.getElementById("playerNameDisplay");
+const scoreSpan = document.getElementById("scoreValue");
+const livesSpan = document.getElementById("livesValue");
+const levelNameSpan = document.getElementById("levelName");
+const enemyNameSpan = document.getElementById("enemyName");
+const enemyHpBar = document.getElementById("enemyHpBar");
+const enemyHpText = document.getElementById("enemyHpText");
+const questionText = document.getElementById("questionText");
+const optionsContainer = document.getElementById("optionsContainer");
+const factsList = document.getElementById("factsList");
+const statusMsg = document.getElementById("statusMsg");
+const resetBtn = document.getElementById("resetGameBtn");
+
+function addInventoryFact(fact) {
+    if (!collectedFacts.includes(fact)) {
+        collectedFacts.push(fact);
+        const li = document.createElement("li");
+        li.textContent = "◈ " + fact;
+        factsList.appendChild(li);
+        factsList.scrollTop = factsList.scrollHeight;
+        if (factsList.children.length > 0 && factsList.children[0].innerText.includes("Derrota enemigos")) factsList.children[0].remove();
+    }
+}
+
+function updateUI() {
+    scoreSpan.textContent = score;
+    livesSpan.textContent = lives;
+    levelNameSpan.textContent = LEVELS[currentLevel].name;
+    enemyNameSpan.textContent = LEVELS[currentLevel].enemyName;
+    let hpPercent = (enemyCurrentHp / LEVELS[currentLevel].enemyMaxHp) * 100;
+    enemyHpBar.style.width = hpPercent + "%";
+    enemyHpText.textContent = Math.floor(hpPercent) + "%";
+}
+
+function showDefeatScreen() {
+    const defeatDiv = document.createElement("div");
+    defeatDiv.className = "defeat-overlay";
+    defeatDiv.innerHTML = `
+        <div class="defeat-content">
+            <div class="defeat-title">💀 FRACASO ESTELAR 💀</div>
+            <div class="defeat-message">${playerName.toUpperCase()}, la misión ha fallado.<br>Los espectros han fragmentado a Cósmica.</div>
+            <button class="defeat-button" id="defeatRestartBtn">⟳ REINICIAR AVENTURA</button>
+        </div>
+    `;
+    document.body.appendChild(defeatDiv);
+    document.getElementById("defeatRestartBtn").addEventListener("click", () => {
+        defeatDiv.remove();
+        resetGameFull();
+    });
+}
+
+let fireworksCanvas, fireworksCtx, fireworksInterval;
+function startFireworks() {
+    if (fireworksCanvas) return;
+    fireworksCanvas = document.createElement("canvas");
+    fireworksCanvas.id = "fireworksCanvas";
+    fireworksCanvas.width = window.innerWidth;
+    fireworksCanvas.height = window.innerHeight;
+    document.body.appendChild(fireworksCanvas);
+    fireworksCtx = fireworksCanvas.getContext("2d");
+    let particles = [];
+    function randomColor() { return `hsl(${Math.random() * 360}, 100%, 60%)`; }
+    function createExplosion(x, y) {
+        for (let i = 0; i < 40; i++) {
+            particles.push({
+                x: x, y: y, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8 - 2,
+                life: 1, color: randomColor(), size: Math.random() * 4 + 2
+            });
+        }
+    }
+    function animateFireworks() {
+        if (!fireworksCtx) return;
+        fireworksCtx.clearRect(0, 0, fireworksCanvas.width, fireworksCanvas.height);
+        for (let i = particles.length-1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.2;
+            p.life -= 0.02;
+            if (p.life <= 0 || p.y > fireworksCanvas.height) {
+                particles.splice(i,1);
+                continue;
+            }
+            fireworksCtx.globalAlpha = p.life;
+            fireworksCtx.fillStyle = p.color;
+            fireworksCtx.beginPath();
+            fireworksCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+            fireworksCtx.fill();
+        }
+        if (Math.random() < 0.05) {
+            let x = Math.random() * fireworksCanvas.width;
+            let y = Math.random() * fireworksCanvas.height * 0.7 + 50;
+            createExplosion(x, y);
+        }
+        fireworksInterval = requestAnimationFrame(animateFireworks);
+    }
+    animateFireworks();
+}
+
+function stopFireworks() {
+    if (fireworksInterval) cancelAnimationFrame(fireworksInterval);
+    if (fireworksCanvas) fireworksCanvas.remove();
+    fireworksCanvas = null;
+}
+
+function showEpicVictory() {
+    const totalQuestions = LEVELS.reduce((acc,l)=>acc+l.questions.length,0);
+    const victoryDiv = document.createElement("div");
+    victoryDiv.className = "victory-overlay";
+    victoryDiv.innerHTML = `
+        <div class="victory-content">
+            <div class="victory-title">✨ VICTORIA CÓSMICA ✨</div>
+            <div class="victory-subtitle">¡HAS RESTAURADO EL LEGADO DE CÓSMICA!</div>
+            <div class="victory-stats">
+                🌟 PUNTUACIÓN: <span>${score}/${totalQuestions}</span> 🌟<br>
+                📚 DATOS ÚNICOS: <span>${collectedFacts.length}</span><br>
+                👤 HÉROE: ${playerName.toUpperCase()}
+            </div>
+            <button class="victory-button" id="victoryRestartBtn">🚀 JUGAR DE NUEVO 🚀</button>
+        </div>
+    `;
+    document.body.appendChild(victoryDiv);
+    startFireworks();
+    document.getElementById("victoryRestartBtn").addEventListener("click", () => {
+        victoryDiv.remove();
+        stopFireworks();
+        resetGameFull();
+    });
+}
+
+function restartCurrentLevel() {
+    currentQIndex = 0;
+    enemyCurrentHp = LEVELS[currentLevel].enemyMaxHp;
+    updateUI();
+    loadQuestion();
+    waitingResponse = false;
+    statusMsg.innerHTML = `🔄 Has perdido una vida. Reintentando nivel ${LEVELS[currentLevel].name}... Vidas restantes: ${lives}`;
+    statusMsg.style.color = "#ffcc88";
+}
+
+function loadQuestion() {
+    if (!gameActive) return;
+    const level = LEVELS[currentLevel];
+    if (currentQIndex >= level.questions.length) {
+        if (enemyCurrentHp <= 0) {
+            if (currentLevel + 1 < LEVELS.length) {
+                currentLevel++;
+                currentQIndex = 0;
+                enemyCurrentHp = LEVELS[currentLevel].enemyMaxHp;
+                updateUI();
+                loadQuestion();
+                statusMsg.innerHTML = `🛸 ¡Nivel superado! Avanzas a ${LEVELS[currentLevel].name}.`;
+                statusMsg.style.color = "#aaffdd";
+            } else {
+                gameVictory();
+            }
+        } else {
+            if (lives > 1) {
+                lives--;
+                updateUI();
+                if (lives > 0) restartCurrentLevel();
+                else { lives = 0; updateUI(); gameActive = false; showDefeatScreen(); disableAllButtons(); }
+            } else {
+                lives = 0; updateUI(); gameActive = false; showDefeatScreen(); disableAllButtons();
+            }
+        }
+        return;
+    }
+    const q = level.questions[currentQIndex];
+    questionText.textContent = q.text;
+    optionsContainer.innerHTML = "";
+    q.options.forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = opt;
+        btn.classList.add("opt-btn");
+        btn.addEventListener("click", () => handleAnswer(idx, btn, q));
+        optionsContainer.appendChild(btn);
+    });
+}
+
+function disableAllButtons() {
+    const btns = document.querySelectorAll(".opt-btn");
+    btns.forEach(btn => btn.disabled = true);
+}
+
+function handleAnswer(selected, btn, questionObj) {
+    if (!gameActive || waitingResponse) return;
+    waitingResponse = true;
+    const isCorrect = (selected === questionObj.correct);
+    if (isCorrect) {
+        btn.classList.add("correct-feedback");
+        score++;
+        scoreSpan.textContent = score;
+        enemyCurrentHp--;
+        if (enemyCurrentHp < 0) enemyCurrentHp = 0;
+        updateUI();
+        if (!collectedFacts.includes(questionObj.fact)) addInventoryFact(questionObj.fact);
+        statusMsg.innerHTML = "✓ ¡Acierto! El enemigo recibe daño. +1 conocimiento.";
+        statusMsg.style.color = "#ccffcc";
+        if (enemyCurrentHp <= 0) {
+            statusMsg.innerHTML = `💥 ¡Derrotaste a ${LEVELS[currentLevel].enemyName}! Avanzas.`;
+            setTimeout(() => {
+                btn.classList.remove("correct-feedback");
+                if (currentLevel + 1 < LEVELS.length) {
+                    currentLevel++;
+                    currentQIndex = 0;
+                    enemyCurrentHp = LEVELS[currentLevel].enemyMaxHp;
+                    updateUI();
+                    loadQuestion();
+                    waitingResponse = false;
+                    statusMsg.innerHTML = "🟢 Nuevo sector detectado. Continúa.";
+                } else { gameVictory(); waitingResponse = false; }
+            }, 600);
+            return;
+        }
+        setTimeout(() => {
+            btn.classList.remove("correct-feedback");
+            currentQIndex++;
+            loadQuestion();
+            waitingResponse = false;
+        }, 500);
+    } else {
+        btn.classList.add("wrong-feedback");
+        lives--;
+        updateUI();
+        statusMsg.innerHTML = `✖ Incorrecto. Pierdes una vida. Te quedan ${lives}.`;
+        statusMsg.style.color = "#ffaa88";
+        if (lives <= 0) {
+            gameActive = false;
+            showDefeatScreen();
+            disableAllButtons();
+            waitingResponse = false;
+            return;
+        }
+        setTimeout(() => {
+            btn.classList.remove("wrong-feedback");
+            loadQuestion();
+            waitingResponse = false;
+        }, 800);
+    }
+}
+
+function gameVictory() {
+    gameActive = false;
+    showEpicVictory();
+    disableAllButtons();
+}
+
+function resetGameFull() {
+    currentLevel = 0; currentQIndex = 0; score = 0; lives = 3; collectedFacts = [];
+    enemyCurrentHp = LEVELS[0].enemyMaxHp; gameActive = true; waitingResponse = false;
+    scoreSpan.textContent = "0"; livesSpan.textContent = "3";
+    factsList.innerHTML = '<li>⚡ Derrota enemigos acertando preguntas y acumula conocimiento.</li>';
+    updateUI();
+    loadQuestion();
+    statusMsg.innerHTML = "🟢 Protocolo reiniciado. ¡Nueva oportunidad!";
+    statusMsg.style.color = "#ccffdd";
+    const btns = document.querySelectorAll(".opt-btn");
+    btns.forEach(btn => btn.disabled = false);
+    const defeatOverlay = document.querySelector(".defeat-overlay");
+    if (defeatOverlay) defeatOverlay.remove();
+    const victoryOverlay = document.querySelector(".victory-overlay");
+    if (victoryOverlay) victoryOverlay.remove();
+    stopFireworks();
+}
+
+function startGame() {
+    let name = playerNameInput.value.trim();
+    if (name === "") name = "COMANDANTE ANÓNIMO";
+    playerName = name;
+    playerNameDisplay.textContent = playerName;
+    welcomeDiv.classList.add("hidden");
+    gameInterface.classList.remove("hidden");
+    currentLevel = 0; currentQIndex = 0; score = 0; lives = 3; collectedFacts = [];
+    enemyCurrentHp = LEVELS[0].enemyMaxHp; gameActive = true; waitingResponse = false;
+    scoreSpan.textContent = "0"; livesSpan.textContent = "3";
+    factsList.innerHTML = '<li>⚡ Derrota enemigos acertando preguntas y acumula conocimiento.</li>';
+    updateUI();
+    loadQuestion();
+    statusMsg.innerHTML = "🟢 Misión iniciada. Responde correctamente para dañar al espectro.";
+}
+
+// Notificaciones aleatorias (datos locos)
+const crazyFacts = [
+    "¿Sabías que? Dos metales iguales se sueldan en el vacío espacial por fricción en frío.",
+    "¿Sabías que? Hay un planeta más negro que el carbón: TrES-2b refleja menos del 1% de luz.",
+    "¿Sabías que? En Venus nieva metal (pirita) en las montañas.",
+    "¿Sabías que? El universo podría tener una estructura tipo 'cerebro' a gran escala.",
+    "¿Sabías que? El sonido más fuerte registrado fue un terremoto en una estrella de neutrones.",
+    "¿Sabías que? Un día en Venus dura más que su año.",
+    "¿Sabías que? La estrella R136a1 es tan masiva que su viento estelar arrasa planetas."
+];
+function showRandomToast() {
+    if (!gameInterface.classList.contains("hidden") && gameActive) {
+        const fact = crazyFacts[Math.floor(Math.random() * crazyFacts.length)];
+        const container = document.getElementById("randomFactContainer");
+        const toast = document.createElement("div");
+        toast.className = "random-toast";
+        toast.innerHTML = `<strong>🔭 ¿SABÍAS QUE?</strong><br>${fact}`;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 7000);
+    }
+}
+let toastInterval;
+function startRandomToasts() {
+    if (toastInterval) clearInterval(toastInterval);
+    toastInterval = setInterval(() => { if (gameInterface && !gameInterface.classList.contains("hidden") && gameActive) showRandomToast(); }, 14000);
+}
+
+// Event listeners
+startBtn.addEventListener("click", () => { startGame(); startRandomToasts(); });
+resetBtn.addEventListener("click", () => { if (!gameInterface.classList.contains("hidden")) resetGameFull(); });
+
+// Fondo de estrellas animadas
+const canvas = document.getElementById("starCanvas");
+const ctx = canvas.getContext("2d");
+let stars = [];
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    initStars();
+}
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 300; i++) {
+        stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            radius: Math.random() * 2 + 0.8,
+            alpha: Math.random() * 0.6 + 0.2,
+            speedY: Math.random() * 0.3 + 0.05,
+            twinkle: Math.random() * Math.PI * 2
+        });
+    }
+}
+let starTime = 0;
+function drawStars() {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (let s of stars) {
+        s.y += s.speedY * 0.2;
+        if (s.y > canvas.height) s.y = 0;
+        let brightness = 0.5 + Math.sin(starTime * 0.02 + s.twinkle) * 0.4;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 240, 200, ${s.alpha * brightness})`;
+        ctx.fill();
+        if (s.radius > 1.2) {
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "#aaf";
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+    }
+    starTime++;
+    requestAnimationFrame(drawStars);
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+drawStars();

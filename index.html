@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ASTRO MISIÓN: Legado de Cósmica</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="cyber-bg"></div>
+<div class="grid-overlay"></div>
+<canvas id="starCanvas"></canvas>
+
+<div class="random-fact-container" id="randomFactContainer"></div>
+
+<div class="game-container" id="gameContainer">
+    <div id="welcomeScreen" class="welcome-screen">
+        <h1>⚡ ASTRO MISIÓN: EL LEGADO DE CÓSMICA ⚡</h1>
+        <p>La IA central "Cósmica" ha sido fragmentada por espectros de datos.<br>Recupera sus archivos respondiendo preguntas espaciales. ¡Tienes 3 vidas para lograrlo!</p>
+        <input type="text" id="playerNameInput" placeholder="INGRESA TU NOMBRE, COMANDANTE" maxlength="20">
+        <br>
+        <button id="startGameBtn">▶ INICIAR AVENTURA</button>
+        <div style="margin-top: 25px; font-size: 0.9rem; color: #aaffdd;">★ 3 Niveles | 3 Vidas | Derrota a los espectros con tu conocimiento ★</div>
+    </div>
+
+    <div id="gameInterface" class="hidden">
+        <div class="tech-header">
+            <div class="score-area">🔷 NEXUS: <span id="scoreValue">0</span></div>
+            <div class="lives-area">💖 VITALIDAD: <span id="livesValue">3</span></div>
+            <div class="level-area">🌌 SECTOR: <span id="levelName">Nivel 1</span></div>
+            <div class="player-name">👤 <span id="playerNameDisplay">---</span></div>
+        </div>
+
+        <div id="enemyPanel" class="enemy-panel">
+            <span class="enemy-name" id="enemyName">ESPECTRO DE DATOS</span>
+            <div class="enemy-stats">
+                <span>INTEGRIDAD:</span>
+                <div class="enemy-hp"><div id="enemyHpBar" class="hp-bar" style="width: 100%;"></div></div>
+                <span id="enemyHpText">100%</span>
+            </div>
+        </div>
+        <div class="quiz-panel">
+            <div class="question-text" id="questionText">Cargando anomalía...</div>
+            <div class="options-grid" id="optionsContainer"></div>
+        </div>
+        <div class="facts-section">
+            <div class="facts-title">📀 >_ DATOS CURIOSOS RECOLECTADOS (INVENTARIO)</div>
+            <ul class="facts-list" id="factsList"><li>⚡ Derrota enemigos acertando preguntas y acumula conocimiento.</li></ul>
+        </div>
+        <div class="game-status" id="statusMsg">🟢 Protocolo activo. Responde para dañar al espectro.</div>
+        <div class="reset-btn" id="resetGameBtn">⟳ REINICIAR AVENTURA</div>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
